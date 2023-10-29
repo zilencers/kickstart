@@ -14,108 +14,146 @@ abnormal_exit() {
    help
 }
 
-# Make sure we clean up before exit
-trap "pkill -P $$" EXIT
+privilege_check() { 
+   if [ $(whoami) != "root" ]; then
+      abnormal_exit "root privileges required"
+   fi
+}
 
-# Check for root privileges 
-if [ $(whoami) != "root" ]; then
-   abnormal_exit "root privileges required"
-fi
+parse_args() {
+   while (( "$#" )); do
+      case "$1" in
+         -d|--disk)
+	    DISK=$2
+	    shift 2
+	    ;;
+         -i|--ip-range) 
+            IP=$2
+	    shift 2
+	    ;;
+         -if|--interface)
+	    INTERFACE=$2
+	    shift 2
+	    ;;
+         -g|--gateway)
+	    GATEWAY=$2
+	    shift 2 
+	    ;;
+         -p|--packages)
+	    PACKAGES=$1
+	    shift
+	    ;;
+         -s|--subnet)
+            SUBNET=$2
+	    shift 2
+	    ;;
+         -h|--help)
+	    help
+	    ;;
+         -*|--*=) # unsupported flags
+	   abnormal_exit "Unsupported flag $1"
+	   ;;
+      esac
+   done
+   
+   # Check for required arguments
+   if [ ! $DISK ] || [ ! $IP ] || [ ! $SUBNET ] || [ ! $GATEWAY ]; then
+      abnormal_exit "Missing required argument(s)"
+   fi
+}
 
-while (( "$#" )); do
-   case "$1" in
-      -d|--disk)
-	 DISK=$2
-	 shift 2
-	 ;;
-      -i|--ip-range) 
-         IP=$2
-	 shift 2
-	 ;;
-      -if|--interface)
-	 INTERFACE=$2
-	 shift 2
-	 ;;
-      -g|--gateway)
-	 GATEWAY=$2
-	 shift 2 
-	 ;;
-      -p|--packages)
-	 PACKAGES=$1
-	 shift
-	 ;;
-      -s|--subnet)
-         SUBNET=$2
-	 shift 2
-	 ;;
-      -h|--help)
-	 help
-	 ;;
-      -*|--*=) # unsupported flags
-	abnormal_exit "Unsupported flag $1"
-	;;
-   esac
-done
+required_pkg_check() {
+   printf "Checking for required packages ..." | tee $LOG
 
-# Check for required arguments
-if [ ! $DISK ] || [ ! $IP ] || [ ! $SUBNET ] || [ ! $GATEWAY ]; then
-    abnormal_exit "Missing required argument(s)"
-fi
+   PKG=$(dnf list --installed podman | grep "Error:") 
 
-printf "Checking for required packages ..." | tee $LOG
-PKG=$(dnf list --installed podman | grep "Error:") 
+   if [ $PKG ]; then
+      echo "Installing podman package ..." | tee $LOG
+      dnf install -y -q podman
+   fi
 
-if [ $PKG ]; then
-   echo "Installing podman package ..." | tee $LOG
-   dnf install -y podman
-fi
-printf "Done\n"
+   printf "Done\n"
+}
 
-printf "Updating kickstart config file ..." | tee $LOG
-sed -i "s/???/$DISK/g" ks.cfg
-printf "Done\n"
+update_config() {
+   printf "Updating kickstart config file ..." | tee $LOG
+   
+   sed -i "s/???/$DISK/g" ks.cfg
+   
+   printf "Done\n"
+}
 
+setup_bridge() {
+# TODO: IF ksbr0 EXISTS, DON'T CREATE ANOTHER ONE...SKIP IT
+   local bridge="ksbr0"
 
-# TODO: Check if br0 exists, if exists br + 1, check again
+   printf "Setting up network bridge ..."
 
-printf "Creating systemd bridge.netdev file ..."
-cat << 'EOF' > "$SYSTEMD_NET_PATH/bridge.netdev"
-[NetDev]
-Name=br0
-Kind=bridge
-EOF
-printf "Done\n"
+   # NetDev 
+   echo "[NetDev]" > "$SYSTEMD_NET_PATH/bridge.netdev"
+   echo "Name=$bridge" >> "$SYSTEMD_NET_PATH/bridge.netdev"
+   echo "Kind=bridge" >> "$SYSTEMD_NET_PATH/bridge.netdev"
+   
+   # Network
+   echo "[Match]" > "$SYSTEMD_NET_PATH/bridge.network"
+   echo "Name=$bridge" >> "$SYSTEMD_NET_PATH/bridge.network"
+   echo "[Network]" >> "$SYSTEMD_NET_PATH/bridge.network"
+   echo "DHCP=both" >> "$SYSTEMD_NET_PATH/bridge.network"
+   
+   # Bind
+   echo "[Match]" > "$SYSTEMD_NET_PATH/bind.network"
+   echo "Name=$INTERFACE" >> "$SYSTEMD_NET_PATH/bind.network"
+   echo "[Network]" >> "$SYSTEMD_NET_PATH/bind.network"
+   echo "Bridge=$bridge" >> "$SYSTEMD_NET_PATH/bind.network"
 
-printf "Creating systemd bridge.network file ..."
-cat << 'EOF' > "$SYSTEMD_NET_PATH/bridge.network"
-[Match]
-Name=br0
+   printf "Done\n"
 
-[Network]
-DHCP=both
-EOF
-printf "Done\n"
+   printf "Restarting network ..."
+   
+   #systemctl restart systemd-networkd
+   
+   printf "Done\n"
+}
 
-printf "Creating systemd bind file ..."
-cat << 'EOF' > "$SYSTEMD_NET_PATH/bind.network"
-[Match]
-Name=enp0s25
+setup_container_net() {
+   printf "Creating podman network ... "
 
-[Network]
-Bridge=br0
-EOF
-printf "Done\n"
+   if [[ ! $(podman network ls | grep -i kickstart) ]]; then
+     sudo podman network create --subnet 192.168.50.0/24 --gateway 192.168.50.1 \ 
+	     --ip-range 192.168.50.2-192.168.50.254 --interface-name ksbr0 --ipam-driver host-local kickstart
+   else
+      printf "exists, skipping\n"
+   fi
+}
 
-printf "Restarting network ..."
-systemctl restart systemd-networkd
-printf "Done\n"
+create_image() {
+   printf "Creating podman image ..."
 
-# TODO: Make sure kickstart network doesn't already exist
-printf "Creating podman network "
-sudo podman network create --subnet 192.168.50.0/24 --gateway 192.168.50.1 \
-	--ip-range 192.168.50.2-192.168.50.254 --interface-name br0 --ipam-driver host-local kickstart
+   if [[ ! $(podman images | grep -o kickstart) ]]; then
+      podman build -q -t kickstart fedora:latest .
+      printf "Done\n"
+   else
+      printf "exists, skipping\n"
+   fi
+}
 
-# Build podman image ...
+create_container() {
 
+#COPY ks.cfg /var/www/html/download/ks.cfg
+#COPY index.html /var/www/html/index.html
+}
 
-# Create podman container
+main() {
+   # Clean up on EXIT
+   trap "pkill -P $$" EXIT
+
+   privilege_check
+   parse_args $@
+   required_pkg_check
+   update_config
+   setup_bridge
+   setup_container_net
+   create_image
+}
+
+main $@
