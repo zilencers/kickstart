@@ -91,62 +91,29 @@ update_config() {
    printf "Done\n"
 }
 
-setup_bridge() {
-# TODO: IF ksbr0 EXISTS, DON'T CREATE ANOTHER ONE...SKIP IT
-   local bridge="ksbr0"
-
-   printf "Setting up network bridge ..."
-
-   # NetDev 
-   echo "[NetDev]" > "$SYSTEMD_NET_PATH/bridge.netdev"
-   echo "Name=$bridge" >> "$SYSTEMD_NET_PATH/bridge.netdev"
-   echo "Kind=bridge" >> "$SYSTEMD_NET_PATH/bridge.netdev"
-   
-   # Network
-   echo "[Match]" > "$SYSTEMD_NET_PATH/bridge.network"
-   echo "Name=$bridge" >> "$SYSTEMD_NET_PATH/bridge.network"
-   echo "[Network]" >> "$SYSTEMD_NET_PATH/bridge.network"
-   echo "DHCP=both" >> "$SYSTEMD_NET_PATH/bridge.network"
-   
-   # Bind
-   echo "[Match]" > "$SYSTEMD_NET_PATH/bind.network"
-   echo "Name=$INTERFACE" >> "$SYSTEMD_NET_PATH/bind.network"
-   echo "[Network]" >> "$SYSTEMD_NET_PATH/bind.network"
-   echo "Bridge=$bridge" >> "$SYSTEMD_NET_PATH/bind.network"
-
-   printf "Done\n"
-
-   printf "Restarting network ..."
-   
-   #systemctl restart systemd-networkd
-   
-   printf "Done\n"
-}
-
 setup_container_net() {
    printf "Creating podman network ... "
 
-#   sudo podman network create -d macvlan --subnet 192.168.0.0/24 --gateway 192.168.0.1 \
-#   --ip-range 192.168.0.253/32 -o parent=wlp3s0 kickstart-macvlan
-
    if [[ ! $(podman network ls | grep -i kickstart) ]]; then
-     podman network create \
-	     --subnet $SUBNET \
-	     --gateway $GATEWAY \
-	     --ip-range $IP \
-	     --interface-name ksbr0 \
-	     --ipam-driver host-local \
-	     kickstart
+      podman network create \
+	      -d macvlan \
+	      --subnet $SUBNET \
+	      --gateway $GATEWAY \
+              --ip-range $IP \
+	      -o parent=$INTERFACE \
+	      kickstart
    else
       printf "exists, skipping\n"
    fi
 }
 
 create_image() {
-   printf "Creating podman image ..."
+   printf "Creating podman image ...\n"
 
    if [[ ! $(podman images | grep -o kickstart) ]]; then
-      podman build -q -t kickstart fedora:latest config/Dockerfile
+
+      podman build -q -t kickstart -f config/Dockerfile
+
       printf "Done\n"
    else
       printf "exists, skipping\n"
@@ -154,20 +121,15 @@ create_image() {
 }
 
 create_container() {
-   printf "Creating podman container ..."
+   printf "Creating podman container ...\n"
 
-   # podman run -d -q --ip 192.168.0.200 --name kickstart --network kickstart localhost/kickstart
-   if [[ ! $(podman ps -a | grep -o kickstart) ]]; then
-      podman run \
-	   -d \
-	   -q \
-	   --name kickstart \
-	   --ip $IP_ADDR \
-	   --net kickstart \
-	   --mac-address 2A:7C:AA:ED:A2:81 \
-	   --dns $DNS \
-	   --dns-search lan \
-	   localhost/kickstart
+   if [[ ! $(podman ps -a | grep -o kickstart) ]]; then  
+   
+      podman run -d -q \
+	      --ip 192.168.0.200 \
+	      --name kickstart \
+	      --network kickstart \
+	      localhost/kickstart
 
       printf "Done\n"
    else
@@ -191,10 +153,10 @@ main() {
    parse_args $@
    required_pkg_check
    update_config
-   setup_bridge
+  # setup_bridge
    setup_container_net
-  # create_image
-  # create_container
+   create_image
+   create_container
 }
 
 main $@
