@@ -27,12 +27,20 @@ parse_args() {
 	    DISK=$2
 	    shift 2
 	    ;;
+	 --dns)
+	    DNS=$2
+	    shift 2
+	    ;;
          -i|--ip-range) 
             IP=$2
 	    shift 2
 	    ;;
          -if|--interface)
 	    INTERFACE=$2
+	    shift 2
+	    ;;
+	 -ip|--ip-address)
+	    IP_ADDR=$2
 	    shift 2
 	    ;;
          -g|--gateway)
@@ -78,7 +86,7 @@ required_pkg_check() {
 update_config() {
    printf "Updating kickstart config file ..." | tee $LOG
    
-   sed -i "s/???/$DISK/g" ks.cfg
+   sed -i "s/???/$DISK/g" config/ks.cfg
    
    printf "Done\n"
 }
@@ -118,9 +126,17 @@ setup_bridge() {
 setup_container_net() {
    printf "Creating podman network ... "
 
+#   sudo podman network create -d macvlan --subnet 192.168.0.0/24 --gateway 192.168.0.1 \
+#   --ip-range 192.168.0.253/32 -o parent=wlp3s0 kickstart-macvlan
+
    if [[ ! $(podman network ls | grep -i kickstart) ]]; then
-     sudo podman network create --subnet 192.168.50.0/24 --gateway 192.168.50.1 \ 
-	     --ip-range 192.168.50.2-192.168.50.254 --interface-name ksbr0 --ipam-driver host-local kickstart
+     podman network create \
+	     --subnet $SUBNET \
+	     --gateway $GATEWAY \
+	     --ip-range $IP \
+	     --interface-name ksbr0 \
+	     --ipam-driver host-local \
+	     kickstart
    else
       printf "exists, skipping\n"
    fi
@@ -130,7 +146,7 @@ create_image() {
    printf "Creating podman image ..."
 
    if [[ ! $(podman images | grep -o kickstart) ]]; then
-      podman build -q -t kickstart fedora:latest .
+      podman build -q -t kickstart fedora:latest config/Dockerfile
       printf "Done\n"
    else
       printf "exists, skipping\n"
@@ -138,9 +154,33 @@ create_image() {
 }
 
 create_container() {
+   printf "Creating podman container ..."
 
-#COPY ks.cfg /var/www/html/download/ks.cfg
-#COPY index.html /var/www/html/index.html
+   # podman run -d -q --ip 192.168.0.200 --name kickstart --network kickstart localhost/kickstart
+   if [[ ! $(podman ps -a | grep -o kickstart) ]]; then
+      podman run \
+	   -d \
+	   -q \
+	   --name kickstart \
+	   --ip $IP_ADDR \
+	   --net kickstart \
+	   --mac-address 2A:7C:AA:ED:A2:81 \
+	   --dns $DNS \
+	   --dns-search lan \
+	   localhost/kickstart
+
+      printf "Done\n"
+   else
+      printf "exists, skipping\n"
+   fi
+
+   # TODO: DETERMINE IF KS.CFG FILE EXISTS, RENAME IF IT DOES
+   printf "Copying files to kickstart container ..."
+   
+   podman cp config/ks.cfg kickstart:/var/www/html/download/ks.cfg
+   podman cp www/index.html kickstart:/var/www/html/index.html
+
+   printf "Done\n"
 }
 
 main() {
@@ -153,7 +193,8 @@ main() {
    update_config
    setup_bridge
    setup_container_net
-   create_image
+  # create_image
+  # create_container
 }
 
 main $@
