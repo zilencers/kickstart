@@ -156,7 +156,7 @@ create_container() {
 
    printf "Done\n" | tee $LOG
    printf "\n" | tee $LOG
-   printf "Access the Kickstart config at:\n" | tee $LOG
+   printf "Serving kickstart file on :\n" | tee $LOG
    printf "http://$IP_ADDR/download/$FILENAME\n" | tee $LOG
 }
 
