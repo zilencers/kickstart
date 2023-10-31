@@ -1,27 +1,26 @@
 #!/bin/bash
 
-echo "------------------------------------------------"
-echo "          Make Kickstart Config"
-echo "------------------------------------------------"
+echo "------------------------------------------------------------------------"
+echo "                           System Setup"
+echo "------------------------------------------------------------------------"
 echo " "
-echo "The following prompts will help you make a"
-echo "kickstart configuration file"
+echo "The following prompts will help you make a kickstart configuration file."
+echo "Please type in your answer at the '>' prompt and press enter"
 
 inst_environment() {
    echo " "
-   echo "What type of installation environment you like?"
-   echo "Please type in your answer."
-   echo "graphical"
-   echo "text"
-   echo "cmdline"
+   echo "---- Installation Environment ----"
+   echo "Please select one of the following:"
+   echo "graphical | text | cmdline"
    printf "> "
    read INST_ENV
 }
 
 eula() {
    echo " "
+   echo "--------------- EULA -------------"
    echo "Automatically accept EULA?"
-   echo "Please type accept or press enter to continue"
+   echo "Type 'accept' or press ENTER to continue"
    printf "> "
    local answer=""
    read answer
@@ -31,9 +30,9 @@ eula() {
 
 kbd_layout() {
    echo " "
-   echo "What keyboard layout would you like to use?"
-   echo "Press enter to use default US keyboard layout or"
-   echo "enter --vckeymap=[country] --xlayouts='country'"
+   echo "---------------- Keyboard Layout ----------------"
+   echo "Press ENTER to use the default US keyboard layout"
+   echo "or enter --vckeymap=[country] --xlayouts='country'"
    printf "> "
    local answer=""
    read answer
@@ -44,9 +43,9 @@ kbd_layout() {
 
 system_lang() {
    echo " "
-   echo "What system language you like to use?"
-   echo "Press enter to use default en_US or enter your"
-   echo "preferred system language"
+   echo "--------------- System Language --------------"
+   echo "Press ENTER to use default en_US.UTF-8 or type"
+   echo "in your preferred system language."
    printf "> "
    local answer
    read answer
@@ -57,11 +56,11 @@ system_lang() {
 
 add_drivers() {
    echo " "
-   echo "Do you need to install additional drivers?"
+   echo "----------- Additional Drivers ------------"
    echo "Search for the driver disk image on a local"
    echo "partition (ie: /dev/sdb1) or enter a source"
    echo "(ie: --source http://path/to/dd.img)"
-   echo "Press enter to skip"
+   echo "Press ENTER to skip"
    printf "> "
    local answer
    read answer
@@ -71,11 +70,12 @@ add_drivers() {
 
 install_media() {
    echo " "
-   echo "What installation method would you like to use?"
+   echo "-------------- Installation Method --------------"
    echo "The default method is cdrom (usb drive). You may"
    echo "enter a URL for a remote install."
-   echo 'ie: --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=fedora-38&arch=x86_64"'
-   echo "Press enter to skip and use the default method."
+   echo 'ie: --mirrorlist="https://mirrors.fedoraproject.org'
+   echo '/mirrorlist?repo=fedora-38&arch=x86_64"'
+   echo "Press ENTER to skip and use the default method."
    printf "> "
    local answer
    read answer
@@ -85,49 +85,75 @@ install_media() {
 }
 
 network_setup() {
+echo "-----------------------------------------------------------------------"
+echo "                           Network Setup"
+echo "-----------------------------------------------------------------------"
+}
+
+hostname() {
    echo " "
-   echo "The following prompts will help you setup your network." 
+   echo "--------- Hostname ----------"
    echo "Please enter a hostname:"
    printf "> "
-   read SYS_HOSTNAME
+   read CMP_NAME
+}
+
+device() {
    echo " "
-   echo "Please enter the device name, MAC address, or specify 'link'"
+   echo "----------------------- Network Device ---------------------------"
+   echo "Please type in the device name, MAC address, or specify 'link'"
    echo "which specifies the first interface with its link in the up state."
    printf "> "
    read DEVICE
+}
+
+ip_allocation() {
    echo " "
-   echo "What boot protocol would you like to use?"
-   echo "ie: dhcp,bootp,static,query,ibft"
+   echo "------------------------ IP Allocation --------------------------"
+   echo "Please type in one of the following: dhcp,bootp,static,query,ibft"
    echo "If static is selected, ip and netmask will need to be defined."
    printf "> "
    read BOOTPROTO
 
    if [ $BOOTPROTO = "static" ]; then
+      echo " "
       echo "Please enter an IP Address:"
       printf "> "
       read IP_ADDR
+
+      echo " "
       echo "Please enter a subnet mask:"
       printf "> "
       read SUBNET_MASK
    fi 
+}
 
+on_boot() {
    echo " "
-   echo "Would you like to enable this device at boot?"
+   echo "---------- On Boot ----------"
+   echo "Enable this device at boot?"
    echo "yes or no"
    printf "> "
    read ONBOOT
+}
+
+wifi() {
    echo " "
-   echo "If the device is a wireless NIC, please enter the SSID:"
+   echo "-------------------- WiFi Setup -----------------------"
+   echo "If the device specified above is a Wireless NIC, please"
+   echo "type in the SSID or press ENTER to skip."
    printf "> "
    read SSID
    
    if [ $SSID ]; then
       echo " "
-      echo "Please enter the WPA Key for the wireless network:"
+      echo "Enter the WPA Key for the wireless network:"
       printf "> "
       read WPAKEY
    fi
+}
 
+net_final() {
    NETWORK="network --device $DEVICE --onboot $ONBOOT --hostname $SYS_HOSTNAME --bootproto $BOOTPROTO " 
 
    if [ $BOOTPROTO = "static" ]; then
@@ -139,10 +165,17 @@ network_setup() {
    fi
 }
 
+pkg_selection() {
+   echo "---------------------------------------------------------------------"
+   echo "                       Package Selection"
+   echo "---------------------------------------------------------------------"
+}
+
 packages() {
    echo " "
-   echo "Please enter a comma separated list, with no spaces,"
-   echo "of packages you would like to install."
+   echo "--------------------- Packages --------------------------"
+   echo "Enter a comma separated list, with no spaces, of packages"
+   echo "to install during setup."
    printf "> "
    local answer
    read answer
@@ -151,33 +184,108 @@ packages() {
    read -ra PKGS <<< "$answer"
 }
 
-write_config() {
-   printf "# Installation Environment\n" >> "$SYS_HOSTNAME.ks"
-   printf "$INST_ENV\n\n" >> "$SYS_HOSTNAME.ks"
+user_accounts() {
+   echo "---------------------------------------------------------------------"
+   echo "                       Users and Groups"
+   echo "---------------------------------------------------------------------"
+}
 
-   printf "# EULA\n" >> "$SYS_HOSTNAME.ks"
-   printf "$EULA\n\n" >> "$SYS_HOSTNAME.ks"
+get_pass() {
+
+    local _result=$1
+    local password=$(python -Wignore -c 'import crypt,getpass; \
+      print(crypt.crypt(getpass.getpass(), crypt.mksalt(crypt.METHOD_SHA512)))')
+    eval $_result="'$password'"
+}
+
+root_account() {
+   echo " "
+   echo "----------------- Root Account ----------------"
+   echo "Enable root account? yes/no"
+   printf "> "
+   local answer
+   read answer
+
+   if [ $answer = 'yes' ]; then
+
+       local _root_passwd
+       get_pass _root_passwd
+       ROOTPW="rootpw --iscrypted $_root_passwd"
+   else
+      ROOTPW="rootpw --lock"
+   fi
+}
+
+user_accounts() {
+   echo " "
+   echo "----------------- User Accounts ----------------"
    
-   printf "# Keyboard Layout\n" >> "$SYS_HOSTNAME.ks"
-   printf "$KEYBOARD\n\n" >> "$SYS_HOSTNAME.ks"
+   local _answer
+   local _username
+   local _groups
+   local _password
+   USERS=()
+
+   echo "Setup a user account? yes/no"
+   printf "> "
+   read _answer
+
+   while true
+   do
+      [ $_answer = "no" ] && break
+           
+      if [ $_answer = "yes" ]; then
+          
+	  printf "Username: "
+	  read _username
+	  
+	  printf "Groups (comma separated): "
+	  read _groups
+
+	  get_pass _password
+	  
+	  USERS+=(--user --name $_username --groups $_groups --iscrypted $_password)
+      fi
+      
+      printf "\nSetup another user? yes/no\n"
+      printf "> "
+      read _answer
+      
+   done
+}
+
+write_config() {
+   local cfg="$CMP_NAME.ks"
+
+   printf "# Installation Environment\n" >> "$cfg"
+   printf "$INST_ENV\n\n" >> "$cfg"
+
+   printf "# EULA\n" >> "$cfg"
+   printf "$EULA\n\n" >> "$cfg"
+   
+   printf "# Keyboard Layout\n" >> "$cfg"
+   printf "$KEYBOARD\n\n" >> "$cfg"
   
-   printf "# System Language\n" >> "$SYS_HOSTNAME.ks"
-   printf "$LANG\n\n" >> "$SYS_HOSTNAME.ks"
+   printf "# System Language\n" >> "$cfg"
+   printf "$LANG\n\n" >> "$cfg"
 
-   printf "# Installation Media\n" >> "$SYS_HOSTNAME.ks"
-   printf "$MEDIA\n\n" >> "$SYS_HOSTNAME.ks"
+   printf "# Installation Media\n" >> "$cfg"
+   printf "$MEDIA\n\n" >> "$cfg"
 
-   printf "# Network\n" >> "$SYS_HOSTNAME.ks"
-   printf "$NETWORK\n\n" >> "$SYS_HOSTNAME.ks"
+   printf "# Network\n" >> "$cfg"
+   printf "$NETWORK\n\n" >> "$cfg"
 
-   printf "# Package\n" >> "$SYS_HOSTNAME.ks"
-   printf "%s\n" '%packages' >> "$SYS_HOSTNAME.ks"
+   printf "# Package\n" >> "$cfg"
+   printf "%s\n" '%packages' >> "$cfg"
 
    for i in "${PKGS[@]}"; do
-      echo "-$i" >> "$SYS_HOSTNAME.ks"
+      echo "-$i" >> "$cfg"
    done
 
-   printf "%s\n\n" '%end' >> "$SYS_HOSTNAME.ks"
+   printf "%s\n\n" '%end' >> "$cfg"
+
+   printf "# Root Account\n" >> "$cfg"
+   printf "$ROOTPW\n\n" >> "$cfg"
 }
 
 main() {
@@ -188,7 +296,16 @@ main() {
    add_drivers
    install_media
    network_setup
+   hostname
+   device
+   ip_allocation
+   on_boot
+   wifi
+   net_final
+   pkg_selection
    packages
+   root_account
+   user_accounts
    write_config
 }
 
