@@ -54,6 +54,18 @@ system_lang() {
    [ $answer] && LANG="lang $answer"
 }
 
+set_time() {
+   echo " "
+   echo "-------------------------- Timezone -------------------------"
+   echo "Enter a timezone for the system. To view a list of available"
+   echo "timezones run: timedatectl list-timezones"
+   printf "> "
+   local _answer
+   read _answer
+
+   TIMEZONE="timezone $_answer --utc"
+}
+
 add_drivers() {
    echo " "
    echo "----------- Additional Drivers ------------"
@@ -154,7 +166,7 @@ wifi() {
 }
 
 net_final() {
-   NETWORK="network --device $DEVICE --onboot $ONBOOT --hostname $SYS_HOSTNAME --bootproto $BOOTPROTO " 
+   NETWORK="network --device $DEVICE --onboot $ONBOOT --hostname $CMP_NAME --bootproto $BOOTPROTO " 
 
    if [ $BOOTPROTO = "static" ]; then
       NETWORK+="--ip $IP_ADDR --netmask $SUBNET_MASK "
@@ -244,9 +256,9 @@ user_accounts() {
 
 	  get_pass _password
 	  
-	  USERS+=(--user --name $_username --groups $_groups --iscrypted $_password)
+	  USERS+=("--user --groups=$_groups --name=$_username --password=$_password --iscrypted")
       fi
-      
+
       printf "\nSetup another user? yes/no\n"
       printf "> "
       read _answer
@@ -269,6 +281,9 @@ write_config() {
    printf "# System Language\n" >> "$cfg"
    printf "$LANG\n\n" >> "$cfg"
 
+   printf "# Timezone\n" >> "$cfg"
+   printf "$TIMEZONE\n\n" >> "$cfg"
+
    printf "# Installation Media\n" >> "$cfg"
    printf "$MEDIA\n\n" >> "$cfg"
 
@@ -286,6 +301,14 @@ write_config() {
 
    printf "# Root Account\n" >> "$cfg"
    printf "$ROOTPW\n\n" >> "$cfg"
+
+   printf "# User Accounts\n" >> "$cfg"
+
+   for i in "${USERS[@]}"; do
+      echo "$i" >> "$cfg"
+   done
+
+   printf "\n"
 }
 
 main() {
@@ -293,6 +316,7 @@ main() {
    eula
    kbd_layout
    system_lang
+   set_time
    add_drivers
    install_media
    network_setup
