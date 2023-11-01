@@ -22,10 +22,10 @@ eula() {
    echo "Automatically accept EULA?"
    echo "Type 'accept' or press ENTER to continue"
    printf "> "
-   local answer=""
-   read answer
+   local _answer
+   read _answer
 
-   [ $answer ] && EULA="eula --$answer"
+   [ $_answer ] && EULA="eula --$_answer"
 }
 
 kbd_layout() {
@@ -34,11 +34,11 @@ kbd_layout() {
    echo "Press ENTER to use the default US keyboard layout"
    echo "or enter --vckeymap=[country] --xlayouts='country'"
    printf "> "
-   local answer=""
-   read answer
+   local _answer
+   read _answer
 
-   [ ! $answer ] && KEYBOARD="keyboard --vckeymap=us --xlayouts='us'"
-   [ $answer ] && KEYBOARD="keyboard $answer"
+   [ ! $_answer ] && KEYBOARD="keyboard --vckeymap=us --xlayouts='us'"
+   [ $_answer ] && KEYBOARD="keyboard $_answer"
 }
 
 system_lang() {
@@ -47,11 +47,11 @@ system_lang() {
    echo "Press ENTER to use default en_US.UTF-8 or type"
    echo "in your preferred system language."
    printf "> "
-   local answer
-   read answer
+   local _answer
+   read _answer
 
-   [ ! $answer ] && LANG="lang en_US.UTF-8"
-   [ $answer] && LANG="lang $answer"
+   [ ! $_answer ] && LANG="lang en_US.UTF-8"
+   [ $_answer] && LANG="lang $_answer"
 }
 
 set_time() {
@@ -74,10 +74,10 @@ add_drivers() {
    echo "(ie: --source http://path/to/dd.img)"
    echo "Press ENTER to skip"
    printf "> "
-   local answer
-   read answer
+   local _answer
+   read _answer
 
-   [ $answer ] && DRIVER="driverdisk $answer"
+   [ $_answer ] && DRIVER="driverdisk $_answer"
 }
 
 install_media() {
@@ -89,14 +89,14 @@ install_media() {
    echo '/mirrorlist?repo=fedora-38&arch=x86_64"'
    echo "Press ENTER to skip and use the default method."
    printf "> "
-   local answer
-   read answer
+   local _answer
+   read _answer
 
-   [ ! $answer ] && MEDIA="cdrom"
-   [ $answer ] && MEDIA="url $answer"
+   [ ! $_answer ] && MEDIA="cdrom"
+   [ $_answer ] && MEDIA="url $_answer"
 }
 
-network_setup() {
+header_network() {
 echo "-----------------------------------------------------------------------"
 echo "                           Network Setup"
 echo "-----------------------------------------------------------------------"
@@ -143,8 +143,7 @@ ip_allocation() {
 on_boot() {
    echo " "
    echo "---------- On Boot ----------"
-   echo "Enable this device at boot?"
-   echo "yes or no"
+   echo "Enable this device at boot? yes/no"
    printf "> "
    read ONBOOT
 }
@@ -177,7 +176,7 @@ net_final() {
    fi
 }
 
-pkg_selection() {
+header_packages() {
    echo "---------------------------------------------------------------------"
    echo "                       Package Selection"
    echo "---------------------------------------------------------------------"
@@ -189,14 +188,14 @@ packages() {
    echo "Enter a comma separated list, with no spaces, of packages"
    echo "to install during setup."
    printf "> "
-   local answer
-   read answer
+   local _answer
+   read _answer
 
    IFS=','
-   read -ra PKGS <<< "$answer"
+   read -ra PKGS <<< "$_answer"
 }
 
-user_accounts() {
+header_users_groups() {
    echo "---------------------------------------------------------------------"
    echo "                       Users and Groups"
    echo "---------------------------------------------------------------------"
@@ -215,10 +214,10 @@ root_account() {
    echo "----------------- Root Account ----------------"
    echo "Enable root account? yes/no"
    printf "> "
-   local answer
-   read answer
+   local _answer
+   read _answer
 
-   if [ $answer = 'yes' ]; then
+   if [ $_answer = 'yes' ]; then
 
        local _root_passwd
        get_pass _root_passwd
@@ -266,6 +265,120 @@ user_accounts() {
    done
 }
 
+header_partitioning() {
+   echo "---------------------------------------------------------------------"
+   echo "                     Storage and Partitioning"
+   echo "---------------------------------------------------------------------"
+}
+
+ignore_disk() {
+   echo " "
+   echo "-------------------- Disk Selection --------------------" 
+   echo "Specify disks to ignore with the --drives=[drives] or" 
+   echo "only use a specific disk with the --only-use= directive."
+   printf "> "
+   local _answer
+   read _answer
+
+   IGNOREDISK="ignoredisk $_answer"
+}
+
+clear_part() {
+   echo " "
+   echo "---------------------- Clear Partition ----------------------"
+   echo "You can clear partitions with the following directives:"
+   echo "--all --drives=sda,sdb (all partitions on drives sda and sdb)"
+   echo "--list=sda2,sda3,sdb1 (only the specified partitions)"
+   echo "--linux (all linux partitions)"
+   echo "Press ENTER to skip with step"
+   printf "> "
+   local _answer
+   read _answer
+
+   [ $_answer ] && CLEARPART="clearpart $_answer"
+}
+
+partition_method() {
+   echo " "
+   echo "How do you want to partition the disk? automatic/manual" 
+   printf "> "
+   local _answer
+   read _answer
+
+   [ $_answer = "automatic" ] && auto_partition || manual_partition
+}
+
+auto_part_selection() {
+   local _answer
+
+   echo " "
+   echo "Choose a filesystem type: ext[2,3,4],reiserfs,jfs,xfs:"
+   printf "> "
+   read _answer
+
+   FSTYPE="--fstype=$_answer"
+
+   printf "\nUse LVM? yes/no\n"
+   printf "> "
+   read _answer
+
+   [ $_answer = "no" ] && LVM="--nolvm" || LVM=""
+
+   printf "\nEncrypt all partitions? yes/no\n"
+   printf "> "
+   read _answer
+
+   [ $_answer = "yes" ] && ENCRYPTED="--encrypted" || ENCRYPTED=""
+
+   if [ $_answer = "yes" ]; then
+      printf "\nEnter a passphrase for encrypted partitions:\n"
+      printf "> "
+      read _answer
+
+      PASSPHRASE="--passphrase=$_answer"
+   fi
+
+   AUTOPART="autopart $FSTYPE "
+   [ -n $LVM ] && AUTOPART+="$LVM "
+   [ -n $ENCRYPTED ] && AUTOPART+="$ENCRYPTED $PASSPHRASE"
+}
+
+auto_partition() {
+   echo " "
+   echo "Use one of the predefined auto partitioning schemes,"
+   echo "lvm, btrfs, plain or thinp? yes/no"
+   printf "> "
+   local _answer_scheme
+   read _answer_scheme
+
+   [ $_answer = "yes" ] && AUTOPART="autopart --type=$_answer" || auto_part_selection
+}
+
+create_bootpart() {
+   echo " "
+   echo "------------------ Boot Partition -----------------"
+   echo "Enter a mount point of either biosboot or /boot/efi"
+   printf "> "
+   local _answer
+   read _answer
+ 
+   printf "\nEnter the disk for this partition:\n"
+   printf "> "
+   local _disk
+   read _disk
+
+   local _result=$1
+   local _mntpoint="part $_answer "
+   [ $_answer == "/boot/efi" ] && \
+       _mntpoint+="fstype=\"efi\" --ondisk=$_disk --size=500 --fsoptions=\"umask=0077,shortname=winnt\" --label=boot"
+   eval $_result="'$_mntpoint'"
+}
+
+manual_partition() {
+   create_bootpart BOOTPART
+   echo $BOOTPART
+}
+
 write_config() {
    local cfg="$CMP_NAME.ks"
 
@@ -308,7 +421,18 @@ write_config() {
       echo "$i" >> "$cfg"
    done
 
-   printf "\n"
+   printf "\n" >> "$cfg"
+
+   printf "# Ignore Disks\n" >> "$cfg"
+   printf "$IGNOREDISK\n\n" >> "$cfg"
+
+   printf "# Clear Partitions\n" >> "$cfg"
+   [ $CLEARPART ] && echo "$CLEARPART\n\n" >> "$cfg" 
+
+   printf "# Partitioning\n" >> "$cfg"
+   [ $AUTOPART ] && echo "$AUTOPART" >> "$cfg"
+   [ $BOOTPART ] && echo "$BOOTPART" >> "$cfg"
+
 }
 
 main() {
@@ -319,17 +443,27 @@ main() {
    set_time
    add_drivers
    install_media
-   network_setup
+
+   header_network
    hostname
    device
    ip_allocation
    on_boot
    wifi
    net_final
-   pkg_selection
+
+   header_packages
    packages
+
+   header_users_groups
    root_account
    user_accounts
+   
+   header_partitioning
+   ignore_disk
+   clear_part
+   partition_method
+   
    write_config
 }
 
