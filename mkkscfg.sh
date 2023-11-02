@@ -354,6 +354,16 @@ auto_partition() {
    [ $_answer = "yes" ] && AUTOPART="autopart --type=$_answer" || auto_part_selection
 }
 
+select_device() {
+   printf "\nEnter the device for this partition:\n"
+   printf "> "
+   local _disk
+   read _disk
+
+   local _result=$1
+   eval $_result="'$_disk'"
+}
+
 create_bootpart() {
    echo " "
    echo "------------------ Boot Partition -----------------"
@@ -361,11 +371,9 @@ create_bootpart() {
    printf "> "
    local _answer
    read _answer
- 
-   printf "\nEnter the disk for this partition:\n"
-   printf "> "
+   
    local _disk
-   read _disk
+   select_device _disk
 
    local _result=$1
    local _mntpoint="part $_answer "
@@ -374,9 +382,91 @@ create_bootpart() {
    eval $_result="'$_mntpoint'"
 }
 
+mount_point() {
+   echo "Enter the mount point for the partition:"
+   printf "> "
+   local _mntpoint
+   read _mntpoint
+
+   local _result=$1
+   eval $_result="'$_mntpoint'"
+}
+
+fstype() {
+   printf "\nEnter the filesystem type, valid values are:\n"
+   printf "ext[2,3,4], xfs, swap, vfat, efi, biosboot\n"
+   printf "> "
+   local _fstype
+   read _fstype
+
+   local _result=$1
+   eval $_result="'$_fstype'"
+}
+
+part_size() {
+   printf "\nEnter the partition size in megabytes (without the unit)\n"
+   printf "> "
+   local _size
+   read _size
+
+   local _result=$1
+   eval $_result="'$_size'"
+}
+
+part_label() {
+   printf "\nEnter a label for the partition.\n"
+   printf "> "
+   local _label
+   read _label
+
+   local _result=$1
+   eval $_result="'$_label'" 
+}
+
+create_partition() {
+   echo " "
+   echo "------------------ Create Partition -----------------"
+   echo " "
+
+   local _partition=()
+   local _mntpoint
+   local _fstype
+   local _ondisk
+   local _size
+   local _label
+
+   while true
+   do
+      mount_point _mntpoint
+      fstype _fstype
+      select_device _ondisk
+      part_size _size
+      part_label _label
+      # TODO: ADD FSOPTIONS
+      _partition+=("part $_mntpoint --fstype=$_fstype --ondisk=$_ondisk --size=$_size --label=$_label")
+
+      printf "\nCreate another partition? yes/no\n"
+      printf "> "
+      local _answer
+      read _answer
+
+      [ $_answer = "no" ] && break
+   done
+
+   local _result=$1
+   eval $_result="'${_partition[@]}'"
+   # part btrfs.107 --fstype="btrfs" --ondisk=sdb --size=9214
+   # part mntpoint --name=name --device=device --rule=rule [options]
+}
+
 manual_partition() {
    create_bootpart BOOTPART
+   create_partition PARTITION
+
    echo $BOOTPART
+   for i in ${PARTITION[@]}; do
+      echo $i
+   done
 }
 
 write_config() {
@@ -427,12 +517,12 @@ write_config() {
    printf "$IGNOREDISK\n\n" >> "$cfg"
 
    printf "# Clear Partitions\n" >> "$cfg"
-   [ $CLEARPART ] && echo "$CLEARPART\n\n" >> "$cfg" 
+   [ $CLEARPART ] && printf "%s\n\n" $CLEARPART >> "$cfg" 
 
    printf "# Partitioning\n" >> "$cfg"
-   [ $AUTOPART ] && echo "$AUTOPART" >> "$cfg"
-   [ $BOOTPART ] && echo "$BOOTPART" >> "$cfg"
-
+   [ -n "$AUTOPART" ] && echo "$AUTOPART" >> "$cfg"
+   [ -n "$BOOTPART" ] && echo "$BOOTPART" >> "$cfg"
+   [ -n "$PARTITION" ] && echo "$PARTITION" >> "$cfg"
 }
 
 main() {
