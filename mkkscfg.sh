@@ -383,44 +383,46 @@ create_bootpart() {
 }
 
 mount_point() {
-   echo "Enter the mount point for the partition:"
+   echo "Enter the mount point for the partition."
+   echo "  * Boot Partition: biosboot or /boot/efi"
+   echo "  * Btrfs Partition w/ SubVol for /: mount point should be btrfs.1xx" 
    printf "> "
-   local _mntpoint
-   read _mntpoint
+   local _answer
+   read _answer
 
    local _result=$1
-   eval $_result="'$_mntpoint'"
+   eval $_result="'$_answer'"
 }
 
 fstype() {
    printf "\nEnter the filesystem type, valid values are:\n"
-   printf "ext[2,3,4], xfs, swap, vfat, efi, biosboot\n"
+   printf "btrfs, ext[2,3,4], xfs, swap, vfat, efi, biosboot\n"
    printf "> "
-   local _fstype
-   read _fstype
+   local _answer
+   read _answer
 
    local _result=$1
-   eval $_result="'$_fstype'"
+   eval $_result="'$_answer'"
 }
 
 part_size() {
    printf "\nEnter the partition size in megabytes (without the unit)\n"
    printf "> "
-   local _size
-   read _size
+   local _answer
+   read _answer
 
    local _result=$1
-   eval $_result="'$_size'"
+   eval $_result="'$_answer'"
 }
 
 part_label() {
    printf "\nEnter a label for the partition.\n"
    printf "> "
-   local _label
-   read _label
+   local _answer
+   read _answer
 
    local _result=$1
-   eval $_result="'$_label'" 
+   eval $_result="'$_answer'" 
 }
 
 create_partition() {
@@ -443,7 +445,12 @@ create_partition() {
       part_size _size
       part_label _label
       # TODO: ADD FSOPTIONS
-      _partition+=("part $_mntpoint --fstype=$_fstype --ondisk=$_ondisk --size=$_size --label=$_label")
+
+      if [ $_mntpoint = "/boot/efi" ]; then
+	 _partition[0]="part $_mntpoint --fstype=\"$_fstype\" --ondisk=$_ondisk --size=$_size --fsoptions=\"umask=0077,shortname=winnt\" --label=$_label|"
+      else
+	 _partition[1]="part $_mntpoint --fstype=\"$_fstype\" --ondisk=$_ondisk --size=$_size --label=$_label|"
+      fi
 
       printf "\nCreate another partition? yes/no\n"
       printf "> "
@@ -453,19 +460,18 @@ create_partition() {
       [ $_answer = "no" ] && break
    done
 
-   local _result=$1
-   eval $_result="'${_partition[@]}'"
-   # part btrfs.107 --fstype="btrfs" --ondisk=sdb --size=9214
-   # part mntpoint --name=name --device=device --rule=rule [options]
+   local _result=($1)
+   eval ${_result[@]}="'${_partition[@]}'"
 }
 
 manual_partition() {
-   create_bootpart BOOTPART
+   # create_bootpart BOOTPART
    create_partition PARTITION
 
-   echo $BOOTPART
-   for i in ${PARTITION[@]}; do
-      echo $i
+   IFS='|' 
+   read -ra PART <<< "${PARTITION[@]}"
+   for i in "${PART[@]}"; do
+      echo "$i"
    done
 }
 
@@ -517,37 +523,40 @@ write_config() {
    printf "$IGNOREDISK\n\n" >> "$cfg"
 
    printf "# Clear Partitions\n" >> "$cfg"
-   [ $CLEARPART ] && printf "%s\n\n" $CLEARPART >> "$cfg" 
+   [ -n "$CLEARPART" ] && printf "%s\n\n" $CLEARPART >> "$cfg" 
 
    printf "# Partitioning\n" >> "$cfg"
    [ -n "$AUTOPART" ] && echo "$AUTOPART" >> "$cfg"
-   [ -n "$BOOTPART" ] && echo "$BOOTPART" >> "$cfg"
-   [ -n "$PARTITION" ] && echo "$PARTITION" >> "$cfg"
+#   [ -n "$BOOTPART" ] && echo "$BOOTPART" >> "$cfg"
+
+   for i in ${PARTITION[@]}; do
+      echo $i >> "$cfg"
+   done
 }
 
 main() {
-   inst_environment
-   eula
-   kbd_layout
-   system_lang
-   set_time
-   add_drivers
-   install_media
+#   inst_environment
+#   eula
+#   kbd_layout
+#   system_lang
+#   set_time
+#   add_drivers
+#   install_media
 
-   header_network
-   hostname
-   device
-   ip_allocation
-   on_boot
-   wifi
-   net_final
+#   header_network
+#   hostname
+#   device
+#   ip_allocation
+#   on_boot
+#   wifi
+#   net_final
 
-   header_packages
-   packages
+#   header_packages
+#   packages
 
-   header_users_groups
-   root_account
-   user_accounts
+#   header_users_groups
+#   root_account
+#   user_accounts
    
    header_partitioning
    ignore_disk
