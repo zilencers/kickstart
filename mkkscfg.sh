@@ -364,24 +364,6 @@ select_device() {
    eval $_result="'$_disk'"
 }
 
-create_bootpart() {
-   echo " "
-   echo "------------------ Boot Partition -----------------"
-   echo "Enter a mount point of either biosboot or /boot/efi"
-   printf "> "
-   local _answer
-   read _answer
-   
-   local _disk
-   select_device _disk
-
-   local _result=$1
-   local _mntpoint="part $_answer "
-   [ $_answer == "/boot/efi" ] && \
-       _mntpoint+="fstype=\"efi\" --ondisk=$_disk --size=500 --fsoptions=\"umask=0077,shortname=winnt\" --label=boot"
-   eval $_result="'$_mntpoint'"
-}
-
 mount_point() {
    echo "Enter the mount point for the partition."
    echo "  * Boot Partition: biosboot or /boot/efi"
@@ -465,14 +447,8 @@ create_partition() {
 }
 
 manual_partition() {
-   # create_bootpart BOOTPART
    create_partition PARTITION
 
-   IFS='|' 
-   read -ra PART <<< "${PARTITION[@]}"
-   for i in "${PART[@]}"; do
-      echo "$i"
-   done
 }
 
 write_config() {
@@ -527,36 +503,39 @@ write_config() {
 
    printf "# Partitioning\n" >> "$cfg"
    [ -n "$AUTOPART" ] && echo "$AUTOPART" >> "$cfg"
-#   [ -n "$BOOTPART" ] && echo "$BOOTPART" >> "$cfg"
 
-   for i in ${PARTITION[@]}; do
-      echo $i >> "$cfg"
-   done
+   if [ -n "${PARTITION[@]}" ]; then
+      IFS='|'
+      read -ra PART <<< "${PARTITION[@]}"
+      for i in "${PART[@]}"; do
+         echo "$i" | xargs >> "$cfg"
+      done
+   fi
 }
 
 main() {
-#   inst_environment
-#   eula
-#   kbd_layout
-#   system_lang
-#   set_time
-#   add_drivers
-#   install_media
+   inst_environment
+   eula
+   kbd_layout
+   system_lang
+   set_time
+   add_drivers
+   install_media
 
-#   header_network
-#   hostname
-#   device
-#   ip_allocation
-#   on_boot
-#   wifi
-#   net_final
+   header_network
+   hostname
+   device
+   ip_allocation
+   on_boot
+   wifi
+   net_final
 
-#   header_packages
-#   packages
+   header_packages
+   packages
 
-#   header_users_groups
-#   root_account
-#   user_accounts
+   header_users_groups
+   root_account
+   user_accounts
    
    header_partitioning
    ignore_disk
