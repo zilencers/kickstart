@@ -255,7 +255,7 @@ user_accounts() {
 
 	  get_pass _password
 	  
-	  USERS+=("--user --groups=$_groups --name=$_username --password=$_password --iscrypted")
+	  USERS+=("user --groups=$_groups --name=$_username --password=$_password --iscrypted")
       fi
 
       printf "\nSetup another user? yes/no\n"
@@ -300,6 +300,7 @@ clear_part() {
 
 partition_method() {
    echo " "
+   echo "----------------- Partitioning Method -----------------"
    echo "How do you want to partition the disk? automatic/manual" 
    printf "> "
    local _answer
@@ -365,7 +366,8 @@ select_device() {
 }
 
 mount_point() {
-   echo "Enter the mount point for the partition or btrfs volume."
+   echo " "
+   echo "Enter the mount point for the partition or btrfs (sub)volume."
    echo "  * Boot Partition: biosboot or /boot/efi"
    echo "  * Btrfs partition mount point should be btrfs.1xx" 
    printf "> "
@@ -407,45 +409,83 @@ part_label() {
    eval $_result="'$_answer'" 
 }
 
+btrfs_raid_level() {
+   echo " "
+   echo "Enter the raid $2 level (0,1,10):"
+   echo "Press ENTER to skip"
+   local _answer
+   read _answer
+
+   local _result=$1
+   eval $_result="'$_answer'"
+}
+
+create_btrfs_subvol() {
+   echo " "
+   echo "------------------ Btrfs Subvolume -----------------"
+   echo " "
+   
+   SUBVOLUME=()
+   local _i=0
+
+   while true
+   do
+      local _mntpoint
+      mount_point _mntpoint
+
+      echo " "
+      echo "Enter a name for the subvolume"
+      printf "> "
+      local _name
+      read _name
+
+      echo " "
+      echo "Enter the parent volume for this subvolume"
+      printf "> "
+      local _parent
+      read _parent
+
+      SUBVOLUME[$_i]="btrfs $_mntpoint --subvol --name=$_name $_parent|"
+      ((_i++))
+
+      echo " "
+      echo "Add another btrfs subvolume? yes/no"
+      printf "> "
+      local _answer
+      read _answer
+
+      [ "$_answer" = "no" ] && break
+   done
+}
+
 create_btrfs_volume() {
    echo " " 
    echo "------------------ Btrfs Volume -----------------"
    local _mntpoint
    mount_point _mntpoint
 
-   echo " "
-   echo "Enter the raid data level (0,1,10):"
-   echo "Press ENTER to skip"
    local _datalevel
-   read _datalevel
+   btrfs_raid_level _datalevel "data"
 
-   echo " "
-   echo "Enter the metadata level (0,1,10):"
-   echo "Press ENTER to skip"
    local _metalevel
-   read _metalevel
+   btrfs_raid_level _metalevel "metadata"
 
    local _label
    part_label _label
 
    echo " "
    echo "Enter the partition to be used for this btrfs volume"
+   printf "> "
    local _part
    read _part
 
    BTRFS_VOLUME="btrfs $_mntpoint "
-   [ -n "$_datalevel" ] && BTRFS_VOLUME+="--data=$_datalevel"
-   [ -n "$_metalevel" ] && BTRFS_VOLUME+="--metadata=$_metalevel"
-   [ -n "$_label" ] && BTRFS_VOLUME+="--label=$_label"
+   [ -n "$_datalevel" ] && BTRFS_VOLUME+="--data=$_datalevel "
+   [ -n "$_metalevel" ] && BTRFS_VOLUME+="--metadata=$_metalevel "
+   [ -n "$_label" ] && BTRFS_VOLUME+="--label=$_label "
    BTRFS_VOLUME+="$_part"
-   
-   # btrfs mntpoint --data=level --metadata=level [--label=] partitions
-   # btrfs / btrfs.100
-}
 
-create_btrfs_subvolume() {
-
-
+   create_btrfs_subvol
 }
 
 create_partition() {
@@ -476,7 +516,7 @@ create_partition() {
 	 _partition[$_i]="part $_mntpoint --fstype=\"$_fstype\" --ondisk=$_ondisk --size=$_size --label=$_label|"
       fi
 
-      (($_i++))
+      ((_i++))
 
       printf "\nCreate another partition? yes/no\n"
       printf "> "
@@ -493,6 +533,7 @@ create_partition() {
 manual_partition() {
    create_partition PARTITION
 
+   [[ -n $(echo $PARTITION | grep -o "btrfs") ]] && create_btrfs_volume
 }
 
 write_config() {
@@ -555,6 +596,15 @@ write_config() {
          echo "$i" | xargs >> "$cfg"
       done
    fi
+
+   [ -n "$BTRFS_VOLUME" ] && echo "$BTRFS_VOLUME" >> "$cfg"
+
+   IFS='|'
+   read -ra SUBVOL <<< "${SUBVOLUME[@]}"
+   for i in "${SUBVOL[@]}"; do
+      echo "$i" | xargs >> "$cfg"
+   done
+
 }
 
 main() {
