@@ -365,9 +365,9 @@ select_device() {
 }
 
 mount_point() {
-   echo "Enter the mount point for the partition."
+   echo "Enter the mount point for the partition or btrfs volume."
    echo "  * Boot Partition: biosboot or /boot/efi"
-   echo "  * Btrfs Partition w/ SubVol for /: mount point should be btrfs.1xx" 
+   echo "  * Btrfs partition mount point should be btrfs.1xx" 
    printf "> "
    local _answer
    read _answer
@@ -398,13 +398,54 @@ part_size() {
 }
 
 part_label() {
-   printf "\nEnter a label for the partition.\n"
+   printf "\nEnter a label for the partition or volume.\n"
    printf "> "
    local _answer
    read _answer
 
    local _result=$1
    eval $_result="'$_answer'" 
+}
+
+create_btrfs_volume() {
+   echo " " 
+   echo "------------------ Btrfs Volume -----------------"
+   local _mntpoint
+   mount_point _mntpoint
+
+   echo " "
+   echo "Enter the raid data level (0,1,10):"
+   echo "Press ENTER to skip"
+   local _datalevel
+   read _datalevel
+
+   echo " "
+   echo "Enter the metadata level (0,1,10):"
+   echo "Press ENTER to skip"
+   local _metalevel
+   read _metalevel
+
+   local _label
+   part_label _label
+
+   echo " "
+   echo "Enter the partition to be used for this btrfs volume"
+   local _part
+   read _part
+
+   BTRFS_VOLUME="btrfs $_mntpoint "
+   [ -n "$_datalevel" ] && BTRFS_VOLUME+="--data=$_datalevel"
+   [ -n "$_metalevel" ] && BTRFS_VOLUME+="--metadata=$_metalevel"
+   [ -n "$_label" ] && BTRFS_VOLUME+="--label=$_label"
+   BTRFS_VOLUME+="$_part"
+   
+   # btrfs mntpoint --data=level --metadata=level [--label=] partitions
+   # btrfs / btrfs.100
+}
+
+create_btrfs_subvolume() {
+
+
 }
 
 create_partition() {
@@ -418,6 +459,7 @@ create_partition() {
    local _ondisk
    local _size
    local _label
+   local _i=1
 
    while true
    do
@@ -431,8 +473,10 @@ create_partition() {
       if [ $_mntpoint = "/boot/efi" ]; then
 	 _partition[0]="part $_mntpoint --fstype=\"$_fstype\" --ondisk=$_ondisk --size=$_size --fsoptions=\"umask=0077,shortname=winnt\" --label=$_label|"
       else
-	 _partition[1]="part $_mntpoint --fstype=\"$_fstype\" --ondisk=$_ondisk --size=$_size --label=$_label|"
+	 _partition[$_i]="part $_mntpoint --fstype=\"$_fstype\" --ondisk=$_ondisk --size=$_size --label=$_label|"
       fi
+
+      (($_i++))
 
       printf "\nCreate another partition? yes/no\n"
       printf "> "
