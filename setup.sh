@@ -1,18 +1,16 @@
 #!/bin/bash
 
 LOG="/var/log/kickstart.log"
-SYSTEMD_NET_PATH="/etc/systemd/network/"
 
 help() {
    echo "Usage: setup.sh [OPTIONS]"
    echo ""
-   echo "-d |--disk	   disk the OS will be installed on"
+   echo "-c |--config      kickstart config filename"
    echo "    --dns         IP Address of the DNS to use"
    echo "-i |--ip-range    pool of IP addresses to use for container network."
    echo "-if|--interface   interface that will be used for macvlan or ipvlan"
    echo "-ip|--ip-address  static IP address to assign to a container"
    echo "-g |--gateway     gateway IP to use for container network"
-   echo "-p |--packages    comma separated list of packages to be installed"
    echo "-s |--subnet      subnet for the container network"
    echo "-h |--help        print help"
    exit 1
@@ -32,8 +30,8 @@ privilege_check() {
 parse_args() {
    while (( "$#" )); do
       case "$1" in
-         -d|--disk)
-	    DISK=$2
+         -c|--config)
+	    CONFIG=$2
 	    shift 2
 	    ;;
 	 --dns)
@@ -56,10 +54,6 @@ parse_args() {
 	    GATEWAY=$2
 	    shift 2 
 	    ;;
-         -p|--packages)
-	    PACKAGES=$1
-	    shift
-	    ;;
          -s|--subnet)
             SUBNET=$2
 	    shift 2
@@ -74,7 +68,7 @@ parse_args() {
    done
    
    # Check for required arguments
-   if [ ! $DISK ] || [ ! $IP ] || [ ! $SUBNET ] || [ ! $GATEWAY ]; then
+   if [ ! $CONFIG ] || [ ! $IP ] || [ ! $SUBNET ] || [ ! $GATEWAY ]; then
       abnormal_exit "Missing required argument(s)"
    fi
 }
@@ -89,14 +83,6 @@ required_pkg_check() {
       dnf install -y -q podman
    fi
 
-   printf "Done\n" | tee $LOG
-}
-
-update_config() {
-   printf "Updating kickstart config file ..." | tee $LOG
-   
-   sed -i "s/???/$DISK/g" config/ks.cfg
-   
    printf "Done\n" | tee $LOG
 }
 
@@ -147,17 +133,16 @@ create_container() {
    fi
 
    printf "Copying files to kickstart container ..." | tee $LOG
-   
-   local uuid=$(uuidgen -r)
-   FILENAME="ks-"${uuid:0:8}".cfg"
 
-   podman cp config/ks.cfg kickstart:/var/www/html/download/$FILENAME
+   local _filename=$(basename $CONFIG)
+
+   podman cp $CONFIG kickstart:/var/www/html/download/$_filename
    podman cp www/index.html kickstart:/var/www/html/index.html
 
    printf "Done\n" | tee $LOG
    printf "\n" | tee $LOG
    printf "Serving kickstart file on :\n" | tee $LOG
-   printf "http://$IP_ADDR/download/$FILENAME\n" | tee $LOG
+   printf "http://$IP_ADDR/download/$_filename\n" | tee $LOG
 }
 
 main() {
@@ -167,7 +152,6 @@ main() {
    parse_args $@
    privilege_check
    required_pkg_check
-   update_config
    setup_container_net
    create_image
    create_container

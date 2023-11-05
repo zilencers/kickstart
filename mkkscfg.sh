@@ -313,6 +313,7 @@ auto_part_selection() {
    local _answer
 
    echo " "
+   echo "----------------- Auto Partitioning -----------------"
    echo "Choose a filesystem type: ext[2,3,4],reiserfs,jfs,xfs:"
    printf "> "
    read _answer
@@ -346,6 +347,7 @@ auto_part_selection() {
 
 auto_partition() {
    echo " "
+   echo "----------------- Partitioning Scheme -----------------"
    echo "Use one of the predefined auto partitioning schemes,"
    echo "lvm, btrfs, plain or thinp? yes/no"
    printf "> "
@@ -366,7 +368,8 @@ select_device() {
 }
 
 mount_point() {
-   echo " "
+   echo " " 
+   echo "------------------------ Mount Point ------------------------"
    echo "Enter the mount point for the partition or btrfs (sub)volume."
    echo "  * Boot Partition: biosboot or /boot/efi"
    echo "  * Btrfs partition mount point should be btrfs.1xx" 
@@ -379,8 +382,10 @@ mount_point() {
 }
 
 fstype() {
-   printf "\nEnter the filesystem type, valid values are:\n"
-   printf "btrfs, ext[2,3,4], xfs, swap, vfat, efi, biosboot\n"
+   echo " "
+   echo "----------------- Filesystem Type -----------------"
+   echo "Enter the filesystem type, valid values are:"
+   echo "btrfs, ext[2,3,4], xfs, swap, vfat, efi, biosboot"
    printf "> "
    local _answer
    read _answer
@@ -390,7 +395,9 @@ fstype() {
 }
 
 part_size() {
-   printf "\nEnter the partition size in megabytes (without the unit)\n"
+   echo " "
+   echo "----------------------- Partition Size -----------------------"
+   echo "Enter the partition size in megabytes (without the unit)"
    printf "> "
    local _answer
    read _answer
@@ -400,7 +407,9 @@ part_size() {
 }
 
 part_label() {
-   printf "\nEnter a label for the partition or volume.\n"
+   echo " "
+   echo "----------------- Partition Label -----------------"
+   echo "Enter a label for the partition or volume."
    printf "> "
    local _answer
    read _answer
@@ -411,6 +420,7 @@ part_label() {
 
 btrfs_raid_level() {
    echo " "
+   echo "----------------- Raid Level -----------------"
    echo "Enter the raid $2 level (0,1,10):"
    echo "Press ENTER to skip"
    local _answer
@@ -422,8 +432,9 @@ btrfs_raid_level() {
 
 create_btrfs_subvol() {
    echo " "
-   echo "------------------ Btrfs Subvolume -----------------"
-   echo " "
+   echo "---------------------------------------------------------------------"
+   echo "                          Btrfs Subvolume"
+   echo "---------------------------------------------------------------------"
    
    SUBVOLUME=()
    local _i=0
@@ -460,7 +471,9 @@ create_btrfs_subvol() {
 
 create_btrfs_volume() {
    echo " " 
-   echo "------------------ Btrfs Volume -----------------"
+   echo "---------------------------------------------------------------------"
+   echo "                          Btrfs Volume"
+   echo "---------------------------------------------------------------------"
    local _mntpoint
    mount_point _mntpoint
 
@@ -473,7 +486,7 @@ create_btrfs_volume() {
    local _label
    part_label _label
 
-   echo " "
+   echo "-------------------- Partition ---------------------"
    echo "Enter the partition to be used for this btrfs volume"
    printf "> "
    local _part
@@ -489,10 +502,6 @@ create_btrfs_volume() {
 }
 
 create_partition() {
-   echo " "
-   echo "------------------ Create Partition -----------------"
-   echo " "
-
    local _partition=()
    local _mntpoint
    local _fstype
@@ -537,7 +546,7 @@ manual_partition() {
 }
 
 write_config() {
-   local cfg="$CMP_NAME.ks"
+   local cfg="config/$CMP_NAME.ks"
 
    printf "# Installation Environment\n" >> "$cfg"
    printf "$INST_ENV\n\n" >> "$cfg"
@@ -604,7 +613,6 @@ write_config() {
    for i in "${SUBVOL[@]}"; do
       echo "$i" | xargs >> "$cfg"
    done
-
 }
 
 main() {
