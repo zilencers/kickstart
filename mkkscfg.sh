@@ -456,7 +456,7 @@ create_btrfs_subvol() {
       local _parent
       read _parent
 
-      SUBVOLUME[$_i]="btrfs $_mntpoint --subvol --name=$_name $_parent|"
+      SUBVOLUME[$_i]="btrfs $_mntpoint --subvol --name=$_name LABEL=$_parent|"
       ((_i++))
 
       echo " "
@@ -519,11 +519,16 @@ create_partition() {
       part_label _label
       # TODO: ADD FSOPTIONS
 
+      _partition[$_i]="part $_mntpoint --fstype=\"$_fstype\" --ondisk=$_ondisk --size=$_size --label=$_label|"
+
       if [ $_mntpoint = "/boot/efi" ]; then
-	 _partition[0]="part $_mntpoint --fstype=\"$_fstype\" --ondisk=$_ondisk --size=$_size --fsoptions=\"umask=0077,shortname=winnt\" --label=$_label|"
-      else
-	 _partition[$_i]="part $_mntpoint --fstype=\"$_fstype\" --ondisk=$_ondisk --size=$_size --label=$_label|"
+         length=${#_partition[$_i]}
+         ((length--))
+         substr=${_partition[$_i]:0:$length}
+         _partition[$_i]=$substr" --fsoptions=\"umask=0077,shortname=winnt\"|"
       fi
+
+      # TODO: Sort partitions by size largest to smallest
 
       ((_i++))
 

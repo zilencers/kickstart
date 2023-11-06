@@ -6,10 +6,12 @@ help() {
    echo "Usage: setup.sh [OPTIONS]"
    echo ""
    echo "-c |--config      kickstart config filename"
+   echo "-d |--dest        destination path on http server where inst-source will be copied"
    echo "    --dns         IP Address of the DNS to use"
    echo "-i |--ip-range    pool of IP addresses to use for container network."
    echo "-if|--interface   interface that will be used for macvlan or ipvlan"
    echo "-ip|--ip-address  static IP address to assign to a container"
+   echo "-is|--inst-source path to the dvd iso image to be copied to http server"
    echo "-g |--gateway     gateway IP to use for container network"
    echo "-s |--subnet      subnet for the container network"
    echo "-h |--help        print help"
@@ -34,6 +36,10 @@ parse_args() {
 	    CONFIG=$2
 	    shift 2
 	    ;;
+	 -d|--dest)
+	    DEST=$2
+	    shift 2
+	    ;;
 	 --dns)
 	    DNS=$2
 	    shift 2
@@ -48,6 +54,10 @@ parse_args() {
 	    ;;
 	 -ip|--ip-address)
 	    IP_ADDR=$2
+	    shift 2
+	    ;;
+	 -is|--inst-source)
+	    INST_SOURCE=$2
 	    shift 2
 	    ;;
          -g|--gateway)
@@ -134,15 +144,21 @@ create_container() {
 
    printf "Copying files to kickstart container ..." | tee $LOG
 
-   local _filename=$(basename $CONFIG)
-
-   podman cp $CONFIG kickstart:/var/www/html/download/$_filename
    podman cp www/index.html kickstart:/var/www/html/index.html
+   
+   local _cfg_filename=$(basename $CONFIG)
+   podman cp $CONFIG kickstart:/var/www/html/download/config/$_cfg_filename
+
+   if [ -n "$INST_SOURCE" ]; then
+      local _inst_src_filename=$(basename $INST_SOURCE)
+      podman exec -it kickstart mkdir -p /var/www/html/download/$DEST 
+      podman cp $INST_SOURCE kickstart:/var/www/html/download/$DEST/$_inst_src_filename
+   fi
 
    printf "Done\n" | tee $LOG
    printf "\n" | tee $LOG
    printf "Serving kickstart file on :\n" | tee $LOG
-   printf "http://$IP_ADDR/download/$_filename\n" | tee $LOG
+   printf "http://$IP_ADDR/download/$_cfg_filename\n" | tee $LOG
 }
 
 main() {
