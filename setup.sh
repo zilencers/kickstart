@@ -158,7 +158,7 @@ create_container() {
    printf "Done\n" | tee $LOG
    printf "\n" | tee $LOG
    printf "Serving kickstart file on :\n" | tee $LOG
-   printf "http://$IP_ADDR/download/$_cfg_filename\n" | tee $LOG
+   printf "http://$IP_ADDR/download/config/$_cfg_filename\n" | tee $LOG
 }
 
 main() {
