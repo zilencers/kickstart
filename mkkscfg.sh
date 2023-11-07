@@ -502,13 +502,14 @@ create_btrfs_volume() {
 }
 
 create_partition() {
-   local _partition=()
+   PARTITIONS=()
+   PART_SIZE=()
    local _mntpoint
    local _fstype
    local _ondisk
    local _size
    local _label
-   local _i=1
+   local _i=0
 
    while true
    do
@@ -518,17 +519,15 @@ create_partition() {
       part_size _size
       part_label _label
       # TODO: ADD FSOPTIONS
-
-      _partition[$_i]="part $_mntpoint --fstype=\"$_fstype\" --ondisk=$_ondisk --size=$_size --label=$_label|"
+      
+      PART_SIZE[$_i]+=$_size
+      PARTITIONS[$_i]+="part $_mntpoint --fstype=\"$_fstype\" --ondisk=$_ondisk --size=$_size --label=$_label"
 
       if [ $_mntpoint = "/boot/efi" ]; then
-         length=${#_partition[$_i]}
-         ((length--))
-         substr=${_partition[$_i]:0:$length}
-         _partition[$_i]=$substr" --fsoptions=\"umask=0077,shortname=winnt\"|"
+         local length=${#PARTITIONS[$_i]}
+         local substr=${PARTITIONS[$_i]:0:$length}
+	 PARTITIONS[$_i]=$substr' --fsoptions="umask=0077,shortname=winnt"'
       fi
-
-      # TODO: Sort partitions by size largest to smallest
 
       ((_i++))
 
@@ -539,15 +538,12 @@ create_partition() {
 
       [ $_answer = "no" ] && break
    done
-
-   local _result=($1)
-   eval ${_result[@]}="'${_partition[@]}'"
 }
 
 manual_partition() {
-   create_partition PARTITION
+   create_partition
 
-   [[ -n $(echo $PARTITION | grep -o "btrfs") ]] && create_btrfs_volume
+   [[ -n $(echo ${PARTITIONS[@]} | grep -o "btrfs") ]] && create_btrfs_volume
 }
 
 write_config() {
@@ -578,7 +574,7 @@ write_config() {
    printf "%s\n" '%packages' >> "$cfg"
 
    for i in "${PKGS[@]}"; do
-      echo "-$i" >> "$cfg"
+      echo "$i" >> "$cfg"
    done
 
    printf "%s\n\n" '%end' >> "$cfg"
@@ -603,11 +599,13 @@ write_config() {
    printf "# Partitioning\n" >> "$cfg"
    [ -n "$AUTOPART" ] && echo "$AUTOPART" >> "$cfg"
 
-   if [ -n "${PARTITION[@]}" ]; then
-      IFS='|'
-      read -ra PART <<< "${PARTITION[@]}"
-      for i in "${PART[@]}"; do
-         echo "$i" | xargs >> "$cfg"
+   if [[ -n "${PARTITIONS[@]}" ]]; then
+      for ((i=0; i <= ${#PART_SIZE[@]}; i++)); do
+	 [[ ${PART_SIZE[$i]} -ge 1024 ]] && echo ${PARTITIONS[$i]} >> "$cfg"
+      done
+
+      for ((j=0; j <= ${#PART_SIZE[@]}; j++)); do
+         [[ ${PART_SIZE[$j]} -le 1024 ]] && echo ${PARTITIONS[$j]} >> "$cfg"
       done
    fi
 
