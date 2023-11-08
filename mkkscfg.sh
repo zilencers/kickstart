@@ -173,6 +173,48 @@ net_final() {
    [ $SSID ] && NETWORK[1]+="--essid=$SSID --wpakey=$WPAKEY "
 }
 
+header_firewall() {
+echo "---------------------------------------------------------------------"
+echo "                           Firewall"
+echo "---------------------------------------------------------------------"
+}
+
+firewall_config() {
+   echo " "
+   echo "Would you like to enable the firewall? yes/no"
+   printf "> "
+   local _answer
+   read _answer
+
+   FIREWALL="firewall --disabled"
+
+   if [ $_answer = "yes" ]; then
+      FIREWALL="firewall --enabled"
+
+      while true
+      do
+         printf "\nConfigure additional firewall rules? yes/no\n"
+         printf "> "
+         read _answer
+
+         if [ $_answer = "yes" ]; then
+            printf "\nUse one of the following directives to specify\n"
+	    printf "the firewall configuration\n"
+	    printf " * --trust=[device] allows all traffic to and from\n"
+	    printf " * --port=[1234:udp] allows ports through the firewall\n"
+	    printf " * --service=[service name] allow services through firewall\n"
+	    printf "> "
+	    local _rule
+	    read _rule
+
+	    FIREWALL+=" $_rule"
+         else
+	    break
+	 fi
+      done
+   fi
+}
+
 header_packages() {
    echo "---------------------------------------------------------------------"
    echo "                       Package Selection"
@@ -489,6 +531,7 @@ create_btrfs_volume() {
    local _label
    part_label _label
 
+   echo " "
    echo "-------------------- Partition ---------------------"
    echo "Enter the partition to be used for this btrfs volume"
    printf "> "
@@ -571,11 +614,13 @@ write_config() {
    printf "$MEDIA\n\n" >> "$cfg"
 
    printf "# Network\n" >> "$cfg"
-   #printf "$NETWORK\n\n" >> "$cfg"
 
    for ((i=0; i <= ${#NETWORK[@]}; i++)); do
       echo ${NETWORK[$i]} >> "$cfg"
    done
+  
+   printf "# Firewall\n" >> "$cfg"
+   printf "$FIREWALL\n\n" >> "$cfg"
 
    printf "# Package\n" >> "$cfg"
    printf "%s\n" '%packages' >> "$cfg"
@@ -641,6 +686,9 @@ main() {
    on_boot
    wifi
    net_final
+
+   header_firewall
+   firewall_config
 
    header_packages
    packages
