@@ -165,15 +165,12 @@ wifi() {
 }
 
 net_final() {
-   NETWORK="network --device $DEVICE --onboot $ONBOOT --hostname $CMP_NAME --bootproto $BOOTPROTO " 
+   NETWORK=()
+   NETWORK[0]+="network --hostname=$CMP_NAME"
+   NETWORK[1]+="network --activate --device=$DEVICE --onboot=$ONBOOT --bootproto=$BOOTPROTO " 
 
-   if [ $BOOTPROTO = "static" ]; then
-      NETWORK+="--ip $IP_ADDR --netmask $SUBNET_MASK "
-   fi
-   
-   if [ $SSID ]; then
-      NETWORK+="--essid $SSID --wpakey $WPAKEY "
-   fi
+   [ $BOOTPROTO = "static" ] && NETWORK[1]+="--ip=$IP_ADDR --netmask=$SUBNET_MASK "
+   [ $SSID ] && NETWORK[1]+="--essid=$SSID --wpakey=$WPAKEY "
 }
 
 header_packages() {
@@ -183,16 +180,21 @@ header_packages() {
 }
 
 packages() {
+   local _default="@server-product-environment,podman,cockpit-podman,git"
+   
    echo " "
    echo "--------------------- Packages --------------------------"
    echo "Enter a comma separated list, with no spaces, of packages"
-   echo "to install during setup."
+   echo "to install during setup or press ENTER to accept the"
+   echo "default packages."
+   echo "Default: $_default"
    printf "> "
    local _answer
    read _answer
 
    IFS=','
-   read -ra PKGS <<< "$_answer"
+   [ ! $_answer ] && read -ra PKGS <<< "$_default"
+   [ $_answer ] && read -ra PKGS <<< "$_answer"
 }
 
 header_users_groups() {
@@ -396,8 +398,9 @@ fstype() {
 
 part_size() {
    echo " "
-   echo "----------------------- Partition Size -----------------------"
+   echo "------------------------- Partition Size -------------------------"
    echo "Enter the partition size in megabytes (without the unit)"
+   echo "NOTE: biosboot requires a size of 2 megabytes or install will fail"
    printf "> "
    local _answer
    read _answer
@@ -568,7 +571,11 @@ write_config() {
    printf "$MEDIA\n\n" >> "$cfg"
 
    printf "# Network\n" >> "$cfg"
-   printf "$NETWORK\n\n" >> "$cfg"
+   #printf "$NETWORK\n\n" >> "$cfg"
+
+   for ((i=0; i <= ${#NETWORK[@]}; i++)); do
+      echo ${NETWORK[$i]} >> "$cfg"
+   done
 
    printf "# Package\n" >> "$cfg"
    printf "%s\n" '%packages' >> "$cfg"
