@@ -592,6 +592,45 @@ manual_partition() {
    [[ -n $(echo ${PARTITIONS[@]} | grep -o "btrfs") ]] && create_btrfs_volume
 }
 
+header_post_inst() {
+   echo "---------------------------------------------------------------------"
+   echo "                   Post Installation Script"
+   echo "---------------------------------------------------------------------"
+}
+
+post_inst() {
+   printf "\nInclude a post installation script? yes/no\n"
+   printf "> "
+   local _answer
+   read _answer
+
+   if [ $_answer = "yes" ]; then
+      printf "\nEnter the path to the script you would like to include:\n"
+      printf "> "
+      read POSTINST_SCRIPT_PATH
+
+      printf "\nEnter the path to the interpreter to use:\n"
+      printf "> "
+      local _interpreter
+      read _interpreter
+
+      printf "\nIf you would like to log the scripts output, enter a path\n"
+      printf "for the log file. Press ENTER to skip.\n"
+      printf "> "
+      local _log
+      read _log
+      
+      printf "\nHalt installation if the script fails? yes/no\n"
+      printf "> "
+      local _error
+      read _error
+
+      POST_INST="%post --interpreter=$_interpreter "
+      [ $_log ] && POST_INST+="--log=$_log "
+      [ $_error = "yes" ] && POST_INST+="--erroronfail"
+   fi
+}
+
 write_config() {
    local cfg="config/$CMP_NAME.ks"
 
@@ -668,6 +707,11 @@ write_config() {
    for i in "${SUBVOL[@]}"; do
       echo "$i" | xargs >> "$cfg"
    done
+
+   printf "# Post Installation Script\n"
+   printf "$POST_INST\n" >> "$cfg"
+   printf "$POSTINST_SCRIPT_PATH" >> "$cfg"
+   printf "%end" >> "$cfg"
 }
 
 main() {
@@ -701,7 +745,10 @@ main() {
    ignore_disk
    clear_part
    partition_method
-   
+
+   header_post_inst
+   post_inst
+
    write_config
 }
 
