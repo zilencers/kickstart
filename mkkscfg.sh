@@ -708,10 +708,15 @@ write_config() {
       echo "$i" | xargs >> "$cfg"
    done
 
-   printf "# Post Installation Script\n"
-   printf "$POST_INST\n" >> "$cfg"
-   printf "$POSTINST_SCRIPT_PATH" >> "$cfg"
-   printf "%end" >> "$cfg"
+   printf "\n# Post Installation Script\n" >> "$cfg"
+   echo "$POST_INST" >> "$cfg"
+
+   while IFS= read -r line
+   do
+      echo "$line" >> "$cfg"
+   done < "$POSTINST_SCRIPT_PATH"
+
+   echo '%end' >> "$cfg"
 }
 
 main() {
