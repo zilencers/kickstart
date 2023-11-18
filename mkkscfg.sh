@@ -221,22 +221,55 @@ header_packages() {
    echo "---------------------------------------------------------------------"
 }
 
+get_pkg_list() {
+   local _file=$PWD"/config/pkg.list"
+   local _pkgs
+
+   while IFS= read -r line
+   do
+      _pkgs+=$line","
+   done < "$_file"
+
+   local _result=$1
+   eval $_result="'$_pkgs'"
+}
+
 packages() {
-   local _default="@server-product-environment,podman,cockpit-podman,git"
-   
+   PKGS=()
+
    echo " "
-   echo "--------------------- Packages --------------------------"
-   echo "Enter a comma separated list, with no spaces, of packages"
-   echo "to install during setup or press ENTER to accept the"
-   echo "default packages."
-   echo "Default: $_default"
+   echo "---------------------- Packages ----------------------------"
+   echo "Select one of the following options:"
+   echo "1. Enter a list of packages here"
+   echo "2. Get packages from config/pkg.list"
    printf "> "
    local _answer
    read _answer
 
+   local _packages
+
+   if [ $_answer -eq 2 ]; then
+      get_pkg_list _packages
+   else
+      printf "\nEnter a comma separated list of packages (no spaces)\n"
+      printf "> "
+      read _packages
+   fi
+
    IFS=','
-   [ ! $_answer ] && read -ra PKGS <<< "$_default"
-   [ $_answer ] && read -ra PKGS <<< "$_answer"
+   read -ra PKGS <<< "$_packages"
+
+#   local _default="@server-product-environment,podman,cockpit-podman,git,nfs-utils,protonvpn-cli"
+#   echo "Enter a comma separated list, with no spaces, of packages"
+#   echo "to install during setup or press ENTER to obtain packages"
+#   echo "from config/packages file."
+#   printf "> "
+#   local _answer
+#   read _answer
+
+#   IFS=','
+#   [ ! $_answer ] && read -ra PKGS <<< "$_default"
+#   [ $_answer ] && read -ra PKGS <<< "$_answer"
 }
 
 header_users_groups() {
@@ -248,9 +281,9 @@ header_users_groups() {
 get_pass() {
 
     local _result=$1
-    local password=$(python -Wignore -c 'import crypt,getpass; \
+    local _password=$(python -Wignore -c 'import crypt,getpass; \
       print(crypt.crypt(getpass.getpass(), crypt.mksalt(crypt.METHOD_SHA512)))')
-    eval $_result="'$password'"
+    eval $_result="'$_password'"
 }
 
 root_account() {
@@ -665,9 +698,11 @@ write_config() {
    printf "%s\n" '%packages' >> "$cfg"
 
    for i in "${PKGS[@]}"; do
-      echo "$i" >> "$cfg"
+      #echo "$i" | tr -d '\n' >> "$cfg"
+      echo "$i"
    done
 
+   read
    printf "%s\n\n" '%end' >> "$cfg"
 
    printf "# Root Account\n" >> "$cfg"
@@ -720,39 +755,39 @@ write_config() {
 }
 
 main() {
-   inst_environment
-   eula
-   kbd_layout
-   system_lang
-   set_time
-   add_drivers
-   install_media
+#   inst_environment
+#   eula
+#   kbd_layout
+#   system_lang
+#   set_time
+#   add_drivers
+#   install_media
 
-   header_network
-   hostname
-   device
-   ip_allocation
-   on_boot
-   wifi
-   net_final
+#   header_network
+#   hostname
+#   device
+#   ip_allocation
+#   on_boot
+#   wifi
+#   net_final
 
-   header_firewall
-   firewall_config
+#   header_firewall
+#   firewall_config
 
    header_packages
    packages
 
-   header_users_groups
-   root_account
-   user_accounts
+#   header_users_groups
+#   root_account
+#   user_accounts
    
-   header_partitioning
-   ignore_disk
-   clear_part
-   partition_method
+#   header_partitioning
+#   ignore_disk
+#   clear_part
+#   partition_method
 
-   header_post_inst
-   post_inst
+#   header_post_inst
+#   post_inst
 
    write_config
 }
