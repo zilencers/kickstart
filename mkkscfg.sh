@@ -258,18 +258,6 @@ packages() {
 
    IFS=','
    read -ra PKGS <<< "$_packages"
-
-#   local _default="@server-product-environment,podman,cockpit-podman,git,nfs-utils,protonvpn-cli"
-#   echo "Enter a comma separated list, with no spaces, of packages"
-#   echo "to install during setup or press ENTER to obtain packages"
-#   echo "from config/packages file."
-#   printf "> "
-#   local _answer
-#   read _answer
-
-#   IFS=','
-#   [ ! $_answer ] && read -ra PKGS <<< "$_default"
-#   [ $_answer ] && read -ra PKGS <<< "$_answer"
 }
 
 header_users_groups() {
@@ -279,11 +267,10 @@ header_users_groups() {
 }
 
 get_pass() {
-
     local _result=$1
-    local _password=$(python -Wignore -c 'import crypt,getpass; \
+    local password=$(python -Wignore -c 'import crypt,getpass; \
       print(crypt.crypt(getpass.getpass(), crypt.mksalt(crypt.METHOD_SHA512)))')
-    eval $_result="'$_password'"
+    eval $_result="'$password'"
 }
 
 root_account() {
@@ -632,15 +619,18 @@ header_post_inst() {
 }
 
 post_inst() {
-   printf "\nInclude a post installation script? yes/no\n"
+   printf "\nInclude post-install script? yes/no\n"
    printf "> "
    local _answer
    read _answer
 
    if [ $_answer = "yes" ]; then
-      printf "\nEnter the path to the script you would like to include:\n"
-      printf "> "
-      read POSTINST_SCRIPT_PATH
+      script=$(ls "$PWD/scripts/")  
+      POSTINST_SCRIPT_PATH="$PWD/scripts/$script"
+
+      #printf "\nEnter the path to the script you would like to include:\n"
+      #printf "> "
+      #read POSTINST_SCRIPT_PATH
 
       printf "\nEnter the path to the interpreter to use:\n"
       printf "> "
@@ -699,10 +689,9 @@ write_config() {
 
    for i in "${PKGS[@]}"; do
       #echo "$i" | tr -d '\n' >> "$cfg"
-      echo "$i"
+      echo "$i" >> "$cfg"
    done
 
-   read
    printf "%s\n\n" '%end' >> "$cfg"
 
    printf "# Root Account\n" >> "$cfg"
@@ -755,39 +744,39 @@ write_config() {
 }
 
 main() {
-#   inst_environment
-#   eula
-#   kbd_layout
-#   system_lang
-#   set_time
-#   add_drivers
-#   install_media
+   inst_environment
+   eula
+   kbd_layout
+   system_lang
+   set_time
+   add_drivers
+   install_media
 
-#   header_network
-#   hostname
-#   device
-#   ip_allocation
-#   on_boot
-#   wifi
-#   net_final
+   header_network
+   hostname
+   device
+   ip_allocation
+   on_boot
+   wifi
+   net_final
 
-#   header_firewall
-#   firewall_config
+   header_firewall
+   firewall_config
 
    header_packages
    packages
 
-#   header_users_groups
-#   root_account
-#   user_accounts
+   header_users_groups
+   root_account
+   user_accounts
    
-#   header_partitioning
-#   ignore_disk
-#   clear_part
-#   partition_method
+   header_partitioning
+   ignore_disk
+   clear_part
+   partition_method
 
-#   header_post_inst
-#   post_inst
+   header_post_inst
+   post_inst
 
    write_config
 }
